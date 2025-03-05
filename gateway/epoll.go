@@ -19,6 +19,7 @@ var ep *ePool    // epoll池
 var tcpNum int32 // 当前服务允许接入的最大tcp连接数
 
 type ePool struct {
+	//fd的封装
 	eChan  chan *connection
 	tables sync.Map
 	eSize  int

@@ -18,6 +18,7 @@ func Init() {
 	dp = &Dispatcher{}
 	dp.candidateTable = make(map[string]*Endport)
 	go func() {
+		//上面source层初始化就在监听etcd前缀key事件
 		for event := range source.EventChan() {
 			switch event.Type {
 			case source.AddNodeEvent:
@@ -75,9 +76,12 @@ func (dp *Dispatcher) addNode(event *source.Event) {
 		ok bool
 	)
 	if ed, ok = dp.candidateTable[event.Key()]; !ok { // 不存在
+		//说明只是etcd中有了，candidateTable还没有，因此要设置
+		//NewEndport里面有个携程维护window
 		ed = NewEndport(event.IP, event.Port)
 		dp.candidateTable[event.Key()] = ed
 	}
+	//把stat发送到ed.window.statChan去进行处理
 	ed.UpdateStat(&Stat{
 		ConnectNum:   event.ConnectNum,
 		MessageBytes: event.MessageBytes,

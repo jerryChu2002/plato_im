@@ -44,6 +44,7 @@ func DataHandler(ctx *context.Context) {
 			logger.CtxErrorf(*ctx, "DataHandler.delFunc.err :%s", err.Error())
 		}
 	}
+	//监听前缀key，有新事件时发送到eventChan中
 	err := dis.WatchService(config.GetServicePathForIPConf(), setFunc, delFunc)
 	if err != nil {
 		panic(err)
