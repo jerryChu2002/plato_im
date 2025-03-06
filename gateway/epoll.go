@@ -20,10 +20,13 @@ var tcpNum int32 // 当前服务允许接入的最大tcp连接数
 
 type ePool struct {
 	//fd的封装
-	eChan  chan *connection
+	eChan chan *connection
+	//fd与conn的映射
 	tables sync.Map
-	eSize  int
-	done   chan struct{}
+	//epoll的数量，8个
+	eSize int
+	//用作资源回收
+	done chan struct{}
 
 	ln *net.TCPListener
 	f  func(c *connection, ep *epoller)
@@ -47,7 +50,7 @@ func newEPool(ln *net.TCPListener, cb func(c *connection, ep *epoller)) *ePool {
 	}
 }
 
-// 创建一个专门处理 accept 事件的协程，与当前cpu的核数对应，能够发挥最大功效
+// 创建一个专门处理 accept 事件的协程，与当前cpu的核数对应，能够发挥最大功效1
 func (e *ePool) createAcceptProcess() {
 	for i := 0; i < runtime.NumCPU(); i++ {
 		go func() {
@@ -109,7 +112,7 @@ func (e *ePool) startEProc() {
 		case <-e.done:
 			return
 		default:
-			connections, err := ep.wait(200) // 200ms 一次轮询避免 忙轮询
+			connections, err := ep.wait(200) // 200ms 一次轮询避免 忙轮询，没有事件的话，返回一个空对象
 			if err != nil && err != syscall.EINTR {
 				fmt.Printf("failed to epoll wait %v\n", err)
 				continue
@@ -118,6 +121,7 @@ func (e *ePool) startEProc() {
 				if conn == nil {
 					break
 				}
+				//调用回调函数
 				e.f(conn, ep)
 			}
 		}
@@ -221,5 +225,7 @@ func checkTcp() bool {
 }
 
 func setTcpConifg(c *net.TCPConn) {
+	//默认两小时的心跳超时时间
+	//todo tcp的其他配置优化，调参
 	_ = c.SetKeepAlive(true)
 }

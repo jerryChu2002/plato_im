@@ -11,6 +11,7 @@ import (
 func ReadData(conn *net.TCPConn) ([]byte, error) {
 	var dataLen uint32
 	dataLenBuf := make([]byte, 4)
+	//从conn中读取固定长度的数据
 	if err := readFixedData(conn, dataLenBuf); err != nil {
 		return nil, err
 	}
