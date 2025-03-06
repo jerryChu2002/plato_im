@@ -46,6 +46,7 @@ func RunMain(path string) {
 	s.Start(context.TODO())
 }
 
+// 只是解析报文，把报体弄出来，给逻辑层做处理，网关层不做业务处理
 func runProc(c *connection, ep *epoller) {
 	ctx := context.Background() // 起始的contenxt
 	// step1: 读取一个完整的消息包
