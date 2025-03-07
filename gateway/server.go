@@ -26,6 +26,7 @@ func RunMain(path string) {
 		log.Fatalf("StartTCPEPollServer err:%s", err.Error())
 		panic(err)
 	}
+	//gateway里的全局协程池
 	initWorkPoll()
 	initEpoll(ln, runProc)
 	fmt.Println("-------------im gateway stated------------")

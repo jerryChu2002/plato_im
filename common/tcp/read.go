@@ -16,7 +16,9 @@ func ReadData(conn *net.TCPConn) ([]byte, error) {
 		return nil, err
 	}
 	// fmt.Printf("readFixedData:%+v\n", dataLenBuf)
+	//这里使用bytes.NewBuffer，把dataLenBuf的byte数组类型转为buffer类型
 	buffer := bytes.NewBuffer(dataLenBuf)
+	//以大端的形式读取数据
 	if err := binary.Read(buffer, binary.BigEndian, &dataLen); err != nil {
 		return nil, fmt.Errorf("read headlen error:%s", err.Error())
 	}
