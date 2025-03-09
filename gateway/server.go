@@ -26,6 +26,7 @@ func RunMain(path string) {
 		log.Fatalf("StartTCPEPollServer err:%s", err.Error())
 		panic(err)
 	}
+	//gateway里的全局协程池
 	initWorkPoll()
 	initEpoll(ln, runProc)
 	fmt.Println("-------------im gateway stated------------")
@@ -34,7 +35,9 @@ func RunMain(path string) {
 		prpc.WithServiceName(config.GetGatewayServiceName()),
 		prpc.WithIP(config.GetGatewayServiceAddr()),
 		prpc.WithPort(config.GetGatewayRPCServerPort()), prpc.WithWeight(config.GetGatewayRPCWeight()))
+
 	fmt.Println(config.GetGatewayServiceName(), config.GetGatewayServiceAddr(), config.GetGatewayRPCServerPort(), config.GetGatewayRPCWeight())
+
 	s.RegisterService(func(server *grpc.Server) {
 		service.RegisterGatewayServer(server, &service.Service{CmdChannel: cmdChannel})
 	})

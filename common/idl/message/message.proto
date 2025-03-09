@@ -15,6 +15,8 @@ enum CmdType { //枚举消息类型
 
 
 // 顶层cmd pb结构
+// 我们的协议结构就是：dataLen+MsgCmd的结构
+// 根据不同的Type选择不同的解码器
 message MsgCmd{
    CmdType Type = 1;
    bytes Payload = 2;
@@ -55,8 +57,8 @@ message LoginMsgHead {
 }
 
 message LoginMsg {
-   LoginMsgHead Head = 1;
-   bytes LoginMsgBody = 2;
+   LoginMsgHead Head = 1;//状态server解析
+   bytes LoginMsgBody = 2;//业务server解析
 }
 
 // 心跳消息

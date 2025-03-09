@@ -33,6 +33,7 @@ type ePool struct {
 }
 
 func initEpoll(ln *net.TCPListener, f func(c *connection, ep *epoller)) {
+	//设置go 进程打开文件数的限制
 	setLimit()
 	ep = newEPool(ln, f)
 	ep.createAcceptProcess()
@@ -50,7 +51,7 @@ func newEPool(ln *net.TCPListener, cb func(c *connection, ep *epoller)) *ePool {
 	}
 }
 
-// 创建一个专门处理 accept 事件的协程，与当前cpu的核数对应，能够发挥最大功效1
+// 创建一个专门处理 accept 事件的协程，与当前cpu的核数对应，能够发挥最大功效
 func (e *ePool) createAcceptProcess() {
 	for i := 0; i < runtime.NumCPU(); i++ {
 		go func() {
@@ -63,7 +64,7 @@ func (e *ePool) createAcceptProcess() {
 				}
 				setTcpConifg(conn)
 				if e != nil {
-					if ne, ok := e.(net.Error); ok && ne.Temporary() {
+					if ne, ok := e.(net.Error); ok && ne.Timeout() {
 						fmt.Errorf("accept temp err: %v", ne)
 						continue
 					}
@@ -112,7 +113,7 @@ func (e *ePool) startEProc() {
 		case <-e.done:
 			return
 		default:
-			connections, err := ep.wait(200) // 200ms 一次轮询避免 忙轮询，没有事件的话，返回一个空对象
+			connections, err := ep.wait(200) // 200ms 一次轮询避免,忙轮询，没有事件的话，返回一个空对象
 			if err != nil && err != syscall.EINTR {
 				fmt.Printf("failed to epoll wait %v\n", err)
 				continue
@@ -134,7 +135,8 @@ func (e *ePool) addTask(c *connection) {
 
 // epoller 对象 轮询器
 type epoller struct {
-	fd            int
+	fd int
+	//fd -> connection映射，要做这个映射的原因：因为当epoll中有事件时，只能拿到fd，而conn是不知道的，有映射关系就比较方便了
 	fdToConnTable sync.Map
 }
 
@@ -150,14 +152,26 @@ func newEpoller() (*epoller, error) {
 
 // TODO: 默认水平触发模式,可采用非阻塞FD,优化边沿触发模式
 func (e *epoller) add(conn *connection) error {
-	// Extract file descriptor associated with the connection
+	// 获取连接关联的文件描述符
 	fd := conn.fd
-	err := unix.EpollCtl(e.fd, syscall.EPOLL_CTL_ADD, fd, &unix.EpollEvent{Events: unix.EPOLLIN | unix.EPOLLHUP, Fd: int32(fd)})
+	// 将fd添加到epoll实例的监控列表
+	// 监控可读事件(EPOLLIN)和连接关闭事件(EPOLLHUP)
+	err := unix.EpollCtl(
+		e.fd,                  // epoll实例的文件描述符
+		syscall.EPOLL_CTL_ADD, // 添加操作
+		fd,                    // 要监控的socket fd
+		&unix.EpollEvent{ // 事件配置
+			Events: unix.EPOLLIN | unix.EPOLLHUP,
+			Fd:     int32(fd),
+		},
+	)
 	if err != nil {
 		return err
 	}
-	e.fdToConnTable.Store(conn.fd, conn)
-	ep.tables.Store(conn.id, conn)
+	// 维护两个映射表：
+	e.fdToConnTable.Store(conn.fd, conn) // fd -> connection映射
+	ep.tables.Store(conn.id, conn)       // connection ID -> connection映射
+	// 将epoller与connection绑定
 	conn.BindEpoller(e)
 	return nil
 }

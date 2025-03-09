@@ -64,6 +64,7 @@ func (r *Register) init(ctx context.Context) error {
 	var err error
 	r.cli, err = clientv3.New(
 		clientv3.Config{
+			// endpoints和dialTimeout都是Register的opt下的
 			Endpoints:   r.endpoints,
 			DialTimeout: r.dialTimeout,
 		})
