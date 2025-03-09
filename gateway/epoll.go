@@ -113,7 +113,7 @@ func (e *ePool) startEProc() {
 		case <-e.done:
 			return
 		default:
-			connections, err := ep.wait(200) // 200ms 一次轮询避免 忙轮询，没有事件的话，返回一个空对象
+			connections, err := ep.wait(200) // 200ms 一次轮询避免,忙轮询，没有事件的话，返回一个空对象
 			if err != nil && err != syscall.EINTR {
 				fmt.Printf("failed to epoll wait %v\n", err)
 				continue
@@ -135,7 +135,8 @@ func (e *ePool) addTask(c *connection) {
 
 // epoller 对象 轮询器
 type epoller struct {
-	fd            int
+	fd int
+	//fd -> connection映射，要做这个映射的原因：因为当epoll中有事件时，只能拿到fd，而conn是不知道的，有映射关系就比较方便了
 	fdToConnTable sync.Map
 }
 
