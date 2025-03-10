@@ -25,7 +25,7 @@ const (
 type ConnIDGenerater struct {
 	mu        sync.Mutex
 	LastStamp int64 // 记录上一次ID的时间戳
-	Sequence  int64 // 当前毫秒已经生成的ID序列号(从0 开始累加) 1毫秒内最多生成2^16个ID
+	Sequence  int64 // 当前毫秒已经生成的ID序列号(从0 开始累加) 1毫秒内最多生成2^16个ID（因为对雪花算法进行了改造）
 }
 
 type connection struct {
