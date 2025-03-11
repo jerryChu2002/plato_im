@@ -60,7 +60,7 @@ func viewPrint(g *gocui.Gui, name, msg string, newline bool) {
 	g.Update(out.Show)
 }
 
-//doRecv work in goroutine
+// doRecv work in goroutine
 func doRecv(g *gocui.Gui) {
 	recvChannel := chat.Recv()
 	for msg := range recvChannel {
@@ -228,7 +228,7 @@ func pasteDown(g *gocui.Gui, cv *gocui.View) error {
 
 func RunMain() {
 	// step1 创建chat的核心对象
-	chat = sdk.NewChat(net.ParseIP("0.0.0.0"), 8900, "logic", "12312321", "2131")
+	chat = sdk.NewChat(net.ParseIP("0.0.0.0"), 8900, "zjr", "12312321", "2131")
 	// step2 创建 GUI 图层对象并进行参与与回调函数的配置
 	g, err := gocui.NewGui(gocui.OutputNormal)
 	if err != nil {
