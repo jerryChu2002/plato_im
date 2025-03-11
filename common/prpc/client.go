@@ -3,6 +3,7 @@ package prpc
 import (
 	"context"
 	"fmt"
+	"google.golang.org/grpc/credentials/insecure"
 	"time"
 
 	"github.com/hardcore-os/plato/common/prpc/discov/plugin"
@@ -86,7 +87,7 @@ func (p *PClient) DialByEndPoint(adrss string) (*grpc.ClientConn, error) {
 
 	options := []grpc.DialOption{
 		grpc.WithChainUnaryInterceptor(interceptors...),
-		grpc.WithInsecure(),
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
 	}
 
 	ctx, _ := context.WithTimeout(context.Background(), dialTimeout)
