@@ -36,6 +36,7 @@ func (s *Service) CancelConn(ctx context.Context, sr *StateRequest) (*StateRespo
 	}, nil
 }
 
+// SendMsg 由gateway server rpc过来
 func (s *Service) SendMsg(ctx context.Context, sr *StateRequest) (*StateResponse, error) {
 	c := context.TODO()
 	s.CmdChannel <- &CmdContext{

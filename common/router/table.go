@@ -11,7 +11,7 @@ import (
 )
 
 const (
-	gatewayRotuerKey = "gateway_rotuer_%d"
+	gatewayRouterKey = "gateway_router_%d"
 	ttl7D            = 7 * 24 * 60 * 60
 )
 
@@ -21,16 +21,16 @@ type Record struct {
 }
 
 func AddRecord(ctx context.Context, did uint64, endpoint string, conndID uint64) error {
-	key := fmt.Sprintf(gatewayRotuerKey, did)
+	key := fmt.Sprintf(gatewayRouterKey, did)
 	value := fmt.Sprintf("%s-%d", endpoint, conndID)
 	return cache.SetString(ctx, key, value, ttl7D*time.Second)
 }
 func DelRecord(ctx context.Context, did uint64) error {
-	key := fmt.Sprintf(gatewayRotuerKey, did)
+	key := fmt.Sprintf(gatewayRouterKey, did)
 	return cache.Del(ctx, key)
 }
 func QueryRecord(ctx context.Context, did uint64) (*Record, error) {
-	key := fmt.Sprintf(gatewayRotuerKey, did)
+	key := fmt.Sprintf(gatewayRouterKey, did)
 	data, err := cache.GetString(ctx, key)
 	if err != nil {
 		return nil, err

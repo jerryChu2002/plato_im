@@ -21,7 +21,7 @@ var tcpNum int32 // 当前服务允许接入的最大tcp连接数
 type ePool struct {
 	//fd的封装
 	eChan chan *connection
-	//fd与conn的映射
+	//connID -> connection 映射
 	tables sync.Map
 	//epoll的数量，8个
 	eSize int

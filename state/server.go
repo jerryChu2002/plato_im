@@ -76,6 +76,7 @@ func msgCmdHandler(cmdCtx *service.CmdContext, msgCmd *message.MsgCmd) {
 
 // 实现登陆功能
 func loginMsgHandler(cmdCtx *service.CmdContext, msgCmd *message.MsgCmd) {
+	//实际当login的时候，只有Head有值,did是客户端分配的
 	loginMsg := &message.LoginMsg{}
 	err := proto.Unmarshal(msgCmd.Payload, loginMsg)
 	if err != nil {
