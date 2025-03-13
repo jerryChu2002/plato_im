@@ -2,6 +2,7 @@ package client
 
 import (
 	"fmt"
+	"github.com/hardcore-os/plato/common/config"
 	"io/ioutil"
 	"log"
 	"math/rand"
@@ -90,7 +91,7 @@ func doSay(g *gocui.Gui, cv *gocui.View) {
 		if p != nil {
 			msg := &sdk.Message{
 				Type:       sdk.MsgTypeText,
-				Name:       "logic",
+				Name:       "zjr",
 				FormUserID: "123213",
 				ToUserID:   "222222",
 				Content:    string(p)}
@@ -228,7 +229,7 @@ func pasteDown(g *gocui.Gui, cv *gocui.View) error {
 
 func RunMain() {
 	// step1 创建chat的核心对象
-	chat = sdk.NewChat(net.ParseIP("0.0.0.0"), 8900, "zjr", "12312321", "2131")
+	chat = sdk.NewChat(net.ParseIP("0.0.0.0"), config.GetGatewayTCPServerPort(), "zjr", "12312321", "2131")
 	// step2 创建 GUI 图层对象并进行参与与回调函数的配置
 	g, err := gocui.NewGui(gocui.OutputNormal)
 	if err != nil {
@@ -246,6 +247,7 @@ func RunMain() {
 		log.Panicln(err)
 	}
 
+	//发送消息入口
 	if err := g.SetKeybinding("main", gocui.KeyEnter, gocui.ModNone, viewUpdate); err != nil {
 		log.Panicln(err)
 	}

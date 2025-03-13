@@ -47,17 +47,21 @@ func NewChat(ip net.IP, port int, nick, userID, sessionID string) *Chat {
 		closeChan:        make(chan struct{}),
 		MsgClientIDTable: make(map[string]uint64),
 	}
+	//循环等着接收消息，做消息展示，（好像可以优化？）
 	go chat.loop()
 	chat.login()
 	go chat.heartbeat()
 	return chat
 }
+
+// 客户端发送消息入口
 func (chat *Chat) Send(msg *Message) {
 	data, _ := json.Marshal(msg)
 	//key := fmt.Sprintf("%d", chat.conn.connID)
 	upMsg := &message.UPMsg{
 		Head: &message.UPMsgHead{
-			ClientID:  chat.getClientID(chat.SessionID),
+			ClientID: chat.getClientID(chat.SessionID),
+			//ConnID由gateway分配，此处是空的
 			ConnID:    chat.conn.connID,
 			SessionId: chat.SessionID,
 		},
@@ -74,7 +78,7 @@ func (chat *Chat) GetCurClientID() uint64 {
 	return 0
 }
 
-//Close close chat
+// Close close chat
 func (chat *Chat) Close() {
 	chat.conn.close()
 	close(chat.closeChan)
@@ -91,7 +95,7 @@ func (chat *Chat) ReConn() {
 	chat.reConn()
 }
 
-//Recv receive message
+// Recv receive message
 func (chat *Chat) Recv() <-chan *Message {
 	return chat.conn.recv()
 }
@@ -132,6 +136,7 @@ func (chat *Chat) getClientID(sessionID string) uint64 {
 	if id, ok := chat.MsgClientIDTable[sessionID]; ok {
 		res = id
 	}
+	//clientID每次重建连接会重新初始化
 	chat.MsgClientIDTable[sessionID] = res + 1
 	return res
 }
