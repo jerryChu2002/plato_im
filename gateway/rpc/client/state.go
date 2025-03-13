@@ -38,6 +38,7 @@ func SendMsg(ctx *context.Context, endpoint string, connID uint64, Payload []byt
 	rpcCtx, _ := context.WithTimeout(*ctx, 100*time.Millisecond)
 	fmt.Println("sendMsg", connID, string(Payload))
 	_, err := stateClient.SendMsg(rpcCtx, &service.StateRequest{
+		//这里设置的是对应gateway server的endpoint
 		Endpoint: endpoint,
 		ConnID:   connID,
 		Data:     Payload,

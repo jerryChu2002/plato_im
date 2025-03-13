@@ -20,10 +20,6 @@ type Record struct {
 	ConndID  uint64
 }
 
-func Init(ctx context.Context) {
-	cache.InitRedis(ctx)
-}
-
 func AddRecord(ctx context.Context, did uint64, endpoint string, conndID uint64) error {
 	key := fmt.Sprintf(gatewayRotuerKey, did)
 	value := fmt.Sprintf("%s-%d", endpoint, conndID)

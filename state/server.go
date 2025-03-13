@@ -14,7 +14,7 @@ import (
 	"google.golang.org/grpc"
 )
 
-// RunMain 启动网关服务
+// RunMain 启动状态服务
 func RunMain(path string) {
 	// 启动时的全局上下文
 	ctx := context.TODO()

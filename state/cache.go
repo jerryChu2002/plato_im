@@ -20,7 +20,8 @@ var cs *cacheState
 
 // 远程cache状态
 type cacheState struct {
-	msgID            uint64 // test
+	msgID uint64 // test
+	// connID -> connState 的映射
 	connToStateTable sync.Map
 	server           *service.Service
 }
@@ -29,8 +30,8 @@ type cacheState struct {
 func InitCacheState(ctx context.Context) {
 	cs = &cacheState{}
 	cache.InitRedis(ctx)
-	router.Init(ctx)
 	cs.connToStateTable = sync.Map{}
+	//这个主要是重启state server的时候用，执行connReLogin
 	cs.initLoginSlot(ctx)
 	cs.server = &service.Service{CmdChannel: make(chan *service.CmdContext, config.GetSateCmdChannelNum())}
 }
@@ -49,7 +50,9 @@ func (cs *cacheState) initLoginSlot(ctx context.Context) error {
 				panic(err)
 			}
 			for _, mate := range loginSlot {
+				//槽中存储的是连接及其对应did
 				did, connID := cs.loginSlotUnmarshal(mate)
+				//每次state server重启的时候，进行一次reLogin
 				cs.connReLogin(ctx, did, connID)
 			}
 		}()
