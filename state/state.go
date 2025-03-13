@@ -39,11 +39,13 @@ func (c *connState) close(ctx context.Context) error {
 	// TODO 这里是要好好思考一下，网络调用次数的时间&空间复杂度的
 	slotKey := cs.getLoginSlotKey(c.connID)
 	meta := cs.loginSlotMarshal(c.did, c.connID)
+	//删除登陆槽位
 	err := cache.SREM(ctx, slotKey, meta)
 	if err != nil {
 		return err
 	}
 
+	//获取connID的槽位
 	slot := cs.getConnStateSlot(c.connID)
 
 	key := fmt.Sprintf(cache.MaxClientIDKey, slot, c.connID, "*")
@@ -60,22 +62,26 @@ func (c *connState) close(ctx context.Context) error {
 		}
 	}
 
+	//根据did删除路由
 	err = router.DelRecord(ctx, c.did)
 	if err != nil {
 		return err
 	}
 
+	//下行消息的lastMsg
 	lastMsg := fmt.Sprintf(cache.LastMsgKey, slot, c.connID)
 	err = cache.Del(ctx, lastMsg)
 	if err != nil {
 		return err
 	}
 
+	//通知gateway server关闭长连接socket
 	err = client.DelConn(&ctx, c.connID, nil)
 	if err != nil {
 		return err
 	}
 
+	//删除本地的状态
 	cs.deleteConnIDState(ctx, c.connID)
 	return nil
 }

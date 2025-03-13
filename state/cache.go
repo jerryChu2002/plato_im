@@ -37,6 +37,7 @@ func InitCacheState(ctx context.Context) {
 
 // 初始化连接登陆槽
 func (cs *cacheState) initLoginSlot(ctx context.Context) error {
+	//默认建1025个槽，从0～1024的数组长度
 	loginSlotRange := config.GetStateServerLoginSlotRange()
 	for _, slot := range loginSlotRange {
 		loginSlotKey := fmt.Sprintf(cache.LoginSlotSetKey, slot)
