@@ -17,5 +17,5 @@ func GetDomainUserRPCWeight() int {
 	return viper.GetInt("user_dimain.weight")
 }
 func GetDomainUserDBDNS() string {
-	return viper.GetString("user_dimain.db_dns")
+	return viper.GetString("user_domain.db_dns")
 }

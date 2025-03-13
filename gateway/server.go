@@ -41,7 +41,7 @@ func RunMain(path string) {
 	s.RegisterService(func(server *grpc.Server) {
 		service.RegisterGatewayServer(server, &service.Service{CmdChannel: cmdChannel})
 	})
-	// 启动rpc 客户端
+	// 启动rpc 请求state的客户端
 	client.Init()
 	// 启动 命令处理写协程
 	go cmdHandler()
