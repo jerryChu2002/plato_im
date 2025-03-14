@@ -56,6 +56,7 @@ func (e *ePool) createAcceptProcess() {
 	for i := 0; i < runtime.NumCPU(); i++ {
 		go func() {
 			for {
+				// 当有客户端接入，就能拿到客户端到gateway的conn
 				conn, e := e.ln.AcceptTCP()
 				// 限流熔断
 				if !checkTcp() {
@@ -85,6 +86,7 @@ func (e *ePool) startEPool() {
 
 // 轮询器池 处理器
 func (e *ePool) startEProc() {
+	//创建一个epoll
 	ep, err := newEpoller()
 	if err != nil {
 		panic(err)
@@ -95,7 +97,7 @@ func (e *ePool) startEProc() {
 			select {
 			case <-e.done:
 				return
-			case conn := <-e.eChan:
+			case conn := <-e.eChan: //获取到连接过来的连接
 				addTcpNum()
 				fmt.Printf("tcpNum:%d\n", tcpNum)
 				if err := ep.add(conn); err != nil {
@@ -113,6 +115,7 @@ func (e *ePool) startEProc() {
 		case <-e.done:
 			return
 		default:
+			//把有可读事件的conn获取到
 			connections, err := ep.wait(200) // 200ms 一次轮询避免,忙轮询，没有事件的话，返回一个空对象
 			if err != nil && err != syscall.EINTR {
 				fmt.Printf("failed to epoll wait %v\n", err)
@@ -161,7 +164,7 @@ func (e *epoller) add(conn *connection) error {
 		syscall.EPOLL_CTL_ADD, // 添加操作
 		fd,                    // 要监控的socket fd
 		&unix.EpollEvent{ // 事件配置
-			Events: unix.EPOLLIN | unix.EPOLLHUP,
+			Events: unix.EPOLLIN | unix.EPOLLHUP, //可读 和 挂起 事件
 			Fd:     int32(fd),
 		},
 	)
@@ -171,7 +174,7 @@ func (e *epoller) add(conn *connection) error {
 	// 维护两个映射表：
 	e.fdToConnTable.Store(conn.fd, conn) // fd -> connection映射
 	ep.tables.Store(conn.id, conn)       // connection ID -> connection映射
-	// 将epoller与connection绑定
+	// 将此epoller与connection绑定，嵌入到conn当中
 	conn.BindEpoller(e)
 	return nil
 }

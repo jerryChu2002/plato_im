@@ -3,10 +3,10 @@ package client
 import (
 	"fmt"
 	"github.com/hardcore-os/plato/common/config"
-	"io/ioutil"
 	"log"
 	"math/rand"
 	"net"
+	"os"
 	"time"
 
 	"github.com/gookit/color"
@@ -273,5 +273,5 @@ func RunMain() {
 	if err := g.MainLoop(); err != nil {
 		log.Println(err)
 	}
-	ioutil.WriteFile("chat.log", []byte(buf), 0644)
+	os.WriteFile("chat.log", []byte(buf), 0644)
 }

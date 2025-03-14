@@ -40,9 +40,10 @@ type Message struct {
 
 func NewChat(ip net.IP, port int, nick, userID, sessionID string) *Chat {
 	chat := &Chat{
-		Nick:             nick,
-		UserID:           userID,
-		SessionID:        sessionID,
+		Nick:      nick,
+		UserID:    userID,
+		SessionID: sessionID,
+		//这里的conn是gateway的conn
 		conn:             newConnet(ip, port),
 		closeChan:        make(chan struct{}),
 		MsgClientIDTable: make(map[string]uint64),
@@ -61,7 +62,7 @@ func (chat *Chat) Send(msg *Message) {
 	upMsg := &message.UPMsg{
 		Head: &message.UPMsgHead{
 			ClientID: chat.getClientID(chat.SessionID),
-			//ConnID由gateway分配，此处是空的
+			// chat.conn的id在login的时候已经初始化
 			ConnID:    chat.conn.connID,
 			SessionId: chat.SessionID,
 		},

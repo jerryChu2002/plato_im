@@ -16,7 +16,9 @@ type luaPart struct {
 
 var luaScriptTable map[string]*luaPart = map[string]*luaPart{
 	LuaCompareAndIncrClientID: {
-		LuaScript: "if redis.call('exists', KEYS[1]) == 0 then redis.call('set', KEYS[1], 0) end;if redis.call('get', KEYS[1]) == ARGV[1] then redis.call('incr', KEYS[1]);redis.call('expire', KEYS[1], ARGV[2]); return 1 else return -1 end",
+		LuaScript: `if redis.call('exists', KEYS[1]) == 0 then redis.call('set', KEYS[1], 0) end;
+if redis.call('get', KEYS[1]) == ARGV[1] then redis.call('incr', KEYS[1]);redis.call('expire', KEYS[1], ARGV[2]); 
+return 1 else return -1 end`,
 	},
 }
 

@@ -34,12 +34,12 @@ func CancelConn(ctx *context.Context, endpoint string, connID uint64, Payload []
 	return nil
 }
 
-func SendMsg(ctx *context.Context, endpoint string, connID uint64, Payload []byte) error {
+func SendMsg(ctx *context.Context, gatewayEndpoint string, connID uint64, Payload []byte) error {
 	rpcCtx, _ := context.WithTimeout(*ctx, 100*time.Millisecond)
 	fmt.Println("sendMsg", connID, string(Payload))
 	_, err := stateClient.SendMsg(rpcCtx, &service.StateRequest{
 		//这里设置的是对应gateway server的endpoint
-		Endpoint: endpoint,
+		Endpoint: gatewayEndpoint,
 		ConnID:   connID,
 		Data:     Payload,
 	})

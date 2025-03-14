@@ -7,7 +7,7 @@ import (
 	"github.com/spf13/viper"
 )
 
-func GetSateCmdChannelNum() int {
+func GetStateCmdChannelNum() int {
 	return viper.GetInt("state.cmd_channel_num")
 }
 func GetSateServiceAddr() string {

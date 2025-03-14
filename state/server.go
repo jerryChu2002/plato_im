@@ -163,6 +163,7 @@ func pushMsg(ctx context.Context, connID, sessionID, msgID uint64, data []byte) 
 		fmt.Printf("Marshal:err=%s\n", err.Error())
 	} else {
 		//TODO 这里就要涉及到 下行消息的下发了,不管成功与否，都要更新last msg
+		//sendMsg 给回gateway
 		sendMsg(connID, message.CmdType_Push, data)
 		err = cs.appendLastMsg(ctx, connID, pushMsg)
 		if err != nil {
@@ -186,7 +187,7 @@ func sendACKMsg(ackType message.CmdType, connID, clientID uint64, code uint32, m
 	sendMsg(connID, message.CmdType_ACK, downLoad)
 }
 
-// 发送msg
+// 发送msg，给到gateway
 func sendMsg(connID uint64, ty message.CmdType, downLoad []byte) {
 	mc := &message.MsgCmd{}
 	mc.Type = ty
