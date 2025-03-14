@@ -49,24 +49,24 @@ func RunMain(path string) {
 	s.Start(context.TODO())
 }
 
-// 只是解析报文，把报体弄出来，给逻辑层做处理，网关层不做业务处理
+// 当监听到可读事件，只是解析报文，把报体弄出来，给逻辑层做处理，网关层不做业务处理
 func runProc(c *connection, ep *epoller) {
 	ctx := context.Background() // 起始的contenxt
 	// step1: 读取一个完整的消息包
 	dataBuf, err := tcp.ReadData(c.conn)
 	if err != nil {
-		// 如果读取conn时发现连接关闭，则直接端口连接
+		// 如果读取conn时发现连接关闭，则直接断开连接
 		// 通知 state 清理掉意外退出的 conn的状态信息
 		if errors.Is(err, io.EOF) {
 			// 这步操作是异步的，不需要等到返回成功在进行，因为消息可靠性的保障是通过协议完成的而非某次cmd
 			ep.remove(c)
-			client.CancelConn(&ctx, getEndpoint(), c.id, nil)
+			client.CancelConn(&ctx, getGatewayEndpoint(), c.id, nil)
 		}
 		return
 	}
 	err = wPool.Submit(func() {
 		// step2:交给 state server rpc 处理
-		client.SendMsg(&ctx, getEndpoint(), c.id, dataBuf)
+		client.SendMsg(&ctx, getGatewayEndpoint(), c.id, dataBuf)
 	})
 	if err != nil {
 		fmt.Errorf("runProc:err:%+v\n", err.Error())
@@ -103,6 +103,6 @@ func sendMsgByCmd(cmd *service.CmdContext) {
 	}
 }
 
-func getEndpoint() string {
+func getGatewayEndpoint() string {
 	return fmt.Sprintf("%s:%d", config.GetGatewayServiceAddr(), config.GetGatewayRPCServerPort())
 }

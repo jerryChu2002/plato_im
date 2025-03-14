@@ -33,7 +33,7 @@ func InitCacheState(ctx context.Context) {
 	cs.connToStateTable = sync.Map{}
 	//这个主要是重启state server的时候用，执行connReLogin
 	cs.initLoginSlot(ctx)
-	cs.server = &service.Service{CmdChannel: make(chan *service.CmdContext, config.GetSateCmdChannelNum())}
+	cs.server = &service.Service{CmdChannel: make(chan *service.CmdContext, config.GetStateCmdChannelNum())}
 }
 
 // 初始化连接登陆槽
@@ -60,6 +60,7 @@ func (cs *cacheState) initLoginSlot(ctx context.Context) error {
 	return nil
 }
 
+// newConnState login或reLogin的时候会调用
 func (cs *cacheState) newConnState(did, connID uint64) *connState {
 	// 创建链接状态对象
 	state := &connState{connID: connID, did: did}
@@ -78,7 +79,7 @@ func (cs *cacheState) connLogin(ctx context.Context, did, connID uint64) error {
 		return err
 	}
 
-	// 添加路由记录
+	// 添加路由记录 todo 这里好像是记录从哪个网关来的？
 	endPoint := fmt.Sprintf("%s:%d", config.GetGatewayServiceAddr(), config.GetGatewayTCPServerPort())
 	err = router.AddRecord(ctx, did, endPoint, connID)
 	if err != nil {
@@ -92,8 +93,10 @@ func (cs *cacheState) connLogin(ctx context.Context, did, connID uint64) error {
 	return nil
 }
 
+// connReLogin 由state server重启使用
 func (cs *cacheState) connReLogin(ctx context.Context, did, connID uint64) {
 	state := cs.newConnState(did, connID)
+	//缓存重建
 	cs.storeConnIDState(connID, state)
 	state.loadMsgTimer(ctx)
 }
@@ -181,11 +184,11 @@ func (cs *cacheState) appendLastMsg(ctx context.Context, connID uint64, pushMsg 
 		return errors.New("connID state is nil")
 	}
 	slot := cs.getConnStateSlot(connID)
-	key := fmt.Sprintf(cache.LastMsgKey, slot, connID)
+	lastMsgKey := fmt.Sprintf(cache.LastMsgKey, slot, connID)
 	// TODO 现在假设一个链接只有一个会话，后面再讲IMserver，会进行重构
 	msgTimerLock := fmt.Sprintf("%d_%d", pushMsg.SessionID, pushMsg.MsgID)
 	msgData, _ := proto.Marshal(pushMsg)
-	state.appendMsg(ctx, key, msgTimerLock, msgData)
+	state.appendMsg(ctx, lastMsgKey, msgTimerLock, msgData)
 	return nil
 }
 

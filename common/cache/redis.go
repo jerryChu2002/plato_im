@@ -109,6 +109,7 @@ func GetString(ctx context.Context, key string) (string, error) {
 	return cmd.String(), cmd.Err()
 }
 
+// 这里用的key为MaxClientIDKey，val为clientID
 func RunLuaInt(ctx context.Context, name string, keys []string, args ...interface{}) (int, error) {
 	if part, ok := luaScriptTable[name]; !ok {
 		return -1, errors.New("lua not registered")

@@ -14,9 +14,12 @@ import (
 
 type connState struct {
 	sync.RWMutex
-	heartTimer   *timingwheel.Timer
-	reConnTimer  *timingwheel.Timer
-	msgTimer     *timingwheel.Timer
+	// 连接登录的时候会初始化，5秒每次
+	heartTimer  *timingwheel.Timer
+	reConnTimer *timingwheel.Timer
+	// 100ms每次，用于当ack丢失时，会进行消息重发
+	msgTimer *timingwheel.Timer
+	// sessionID_msgID 的结构
 	msgTimerLock string
 	connID       uint64
 	did          uint64
@@ -86,7 +89,7 @@ func (c *connState) close(ctx context.Context) error {
 	return nil
 }
 
-func (c *connState) appendMsg(ctx context.Context, key, msgTimerLock string, msgData []byte) {
+func (c *connState) appendMsg(ctx context.Context, lastMsgKey, msgTimerLock string, msgData []byte) {
 	c.Lock()
 	defer c.Unlock()
 	c.msgTimerLock = msgTimerLock
@@ -99,9 +102,9 @@ func (c *connState) appendMsg(ctx context.Context, key, msgTimerLock string, msg
 		rePush(c.connID)
 	})
 	c.msgTimer = t
-	err := cache.SetBytes(ctx, key, msgData, cache.TTL7D)
+	err := cache.SetBytes(ctx, lastMsgKey, msgData, cache.TTL7D)
 	if err != nil {
-		panic(key)
+		panic(lastMsgKey)
 	}
 }
 
