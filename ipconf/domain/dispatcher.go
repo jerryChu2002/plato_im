@@ -18,7 +18,7 @@ func Init() {
 	dp = &Dispatcher{}
 	dp.candidateTable = make(map[string]*Endport)
 	go func() {
-		//上面source层初始化就在监听etcd前缀key事件
+		//上面source层初始化就在监听etcd前缀key事件，有事件就会进入到这里
 		for event := range source.EventChan() {
 			switch event.Type {
 			case source.AddNodeEvent:
@@ -34,6 +34,7 @@ func Dispatch(ctx *IpConfContext) []*Endport {
 	eds := dp.getCandidateEndport(ctx)
 	// Step2: 逐一计算得分
 	for _, ed := range eds {
+		//把对应的分数设置上
 		ed.CalculateScore(ctx)
 	}
 	// Step3: 全局排序，动静结合的排序策略。

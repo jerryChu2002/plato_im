@@ -15,7 +15,8 @@ import (
 type connState struct {
 	sync.RWMutex
 	// 连接登录的时候会初始化，5秒每次
-	heartTimer  *timingwheel.Timer
+	heartTimer *timingwheel.Timer
+	// 10秒
 	reConnTimer *timingwheel.Timer
 	// 100ms每次，用于当ack丢失时，会进行消息重发
 	msgTimer *timingwheel.Timer
@@ -134,6 +135,7 @@ func (c *connState) loadMsgTimer(ctx context.Context) {
 	c.reSetMsgTimer(c.connID, data.SessionID, data.MsgID)
 }
 
+// 当新连接login的时候以及心跳处理时，会重置connState中的心跳定时器以及重连定时器
 func (c *connState) reSetHeartTimer() {
 	c.Lock()
 	defer c.Unlock()
