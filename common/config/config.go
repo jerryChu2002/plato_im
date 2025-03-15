@@ -24,6 +24,7 @@ func GetTimeoutForDiscovery() time.Duration {
 	return viper.GetDuration("discovery.timeout") * time.Second
 }
 
+// GetServicePathForIPConf 获取监听的前缀
 func GetServicePathForIPConf() string {
 	return viper.GetString("ip_conf.service_path")
 }

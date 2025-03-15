@@ -104,7 +104,7 @@ func hearbeatMsgHandler(cmdCtx *service.CmdContext, msgCmd *message.MsgCmd) {
 	}
 	cs.reSetHeartTimer(cmdCtx.ConnID)
 	fmt.Printf("hearbeatMsgHandler connID=%d\n", cmdCtx.ConnID)
-	// TODO未减少通信量，可以暂时不回复心跳的ack
+	// TODO为减少通信量，可以暂时不回复心跳的ack
 }
 
 // 重连逻辑处理
@@ -134,7 +134,7 @@ func upMsgHandler(cmdCtx *service.CmdContext, msgCmd *message.MsgCmd) {
 		return
 	}
 	if cs.compareAndIncrClientID(*cmdCtx.Ctx, cmdCtx.ConnID, upMsg.Head.ClientID, upMsg.Head.SessionId) {
-		// 调用下游业务层rpc，只有当rpc回复成功后才能更新max_clientID
+		// 调用下游业务层rpc
 		sendACKMsg(message.CmdType_UP, cmdCtx.ConnID, upMsg.Head.ClientID, 0, "ok")
 		// TODO 这里应该调用业务层的代码
 		pushMsg(*cmdCtx.Ctx, cmdCtx.ConnID, cs.msgID, 0, upMsg.UPMsgBody)
