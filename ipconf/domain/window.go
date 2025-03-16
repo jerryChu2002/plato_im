@@ -28,7 +28,7 @@ func (sw *stateWindow) getStat() *Stat {
 func (sw *stateWindow) appendStat(s *Stat) {
 	// 减去即将被删除的state
 	sw.sumStat.Sub(sw.stateQueue[sw.idx%windowSize])
-	// 放入最新的stat
+	// 放入最新的stat，这里会直接覆盖掉
 	sw.stateQueue[sw.idx%windowSize] = s
 	// 计算最新的窗口和
 	sw.sumStat.Add(s)
