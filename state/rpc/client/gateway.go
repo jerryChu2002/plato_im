@@ -2,40 +2,23 @@ package client
 
 import (
 	"context"
-	"fmt"
 	"time"
 
-	"github.com/hardcore-os/plato/common/config"
-	"github.com/hardcore-os/plato/common/prpc"
-	"github.com/hardcore-os/plato/gateway/rpc/service"
+	"github.com/hardcore-os/plato/common/gwclient"
 )
 
-var gatewayClient service.GatewayClient
-
-func initGatewayClient() {
-	pCli, err := prpc.NewPClient(config.GetGatewayServiceName())
-	if err != nil {
-		panic(err)
-	}
-	conn, err := pCli.DialByEndPoint(config.GetStateServerGatewayServerEndpoint())
-	if err != nil {
-		panic(err)
-	}
-	gatewayClient = service.NewGatewayClient(conn)
+// Push 精确路由到endpoint对应的那台gateway实例，把payload写给它持有的connID连接。
+// endpoint必须是调用方已经查好的目标gateway实例地址(比如从router.QueryRecord按did查出来的)，
+// 不再像早期实现那样在initGatewayClient()里写死连一个固定的gateway地址。
+func Push(ctx *context.Context, endpoint string, connID uint64, Payload []byte) error {
+	rpcCtx, cancel := context.WithTimeout(*ctx, 3*time.Second)
+	defer cancel()
+	return gwclient.PushToGateway(rpcCtx, endpoint, connID, Payload)
 }
 
-func DelConn(ctx *context.Context, connID uint64, Payload []byte) error {
-	rpcCtx, _ := context.WithTimeout(*ctx, 100*time.Millisecond)
-	gatewayClient.DelConn(rpcCtx, &service.GatewayRequest{ConnID: connID, Data: Payload})
-	return nil
-}
-
-func Push(ctx *context.Context, connID uint64, Payload []byte) error {
-	rpcCtx, _ := context.WithTimeout(*ctx, 100*time.Second)
-	resp, err := gatewayClient.Push(rpcCtx, &service.GatewayRequest{ConnID: connID, Data: Payload})
-	if err != nil {
-		fmt.Println(err)
-	}
-	fmt.Println(resp)
-	return nil
+// DelConn 通知endpoint对应的gateway实例主动关闭某个connID的长连接。
+func DelConn(ctx *context.Context, endpoint string, connID uint64, Payload []byte) error {
+	rpcCtx, cancel := context.WithTimeout(*ctx, 3*time.Second)
+	defer cancel()
+	return gwclient.DelConnOnGateway(rpcCtx, endpoint, connID)
 }

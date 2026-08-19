@@ -2,7 +2,12 @@ package service
 
 import (
 	context "context"
+	"errors"
+	"strings"
+	"time"
 
+	"github.com/hardcore-os/plato/common/auth"
+	base "github.com/hardcore-os/plato/common/idl/base"
 	"github.com/hardcore-os/plato/domain/user/storage"
 )
 
@@ -10,6 +15,46 @@ var sm *storage.StorageManager
 
 func Init(isTest bool) {
 	sm = storage.NewStorageManager(isTest)
+}
+
+func (s *Service) Register(ctx context.Context, req *RegisterRequest) (*RegisterResponse, error) {
+	userID, err := sm.Register(ctx, req.GetAccount(), req.GetPassword(), req.GetNickname(), req.GetDeviceID())
+	if err != nil {
+		code := uint32(1)
+		if errors.Is(err, storage.ErrAccountExists) {
+			code = 2
+		}
+		return &RegisterResponse{Base: &base.BaseResp{Code: code, Msg: err.Error()}}, nil
+	}
+	return &RegisterResponse{
+		Base:         &base.BaseResp{Code: 0, Msg: "ok"},
+		UserID:       userID,
+		SessionToken: auth.IssueSessionToken(userID, req.GetDeviceID(), time.Now()),
+	}, nil
+}
+
+func (s *Service) Login(ctx context.Context, req *LoginRequest) (*LoginResponse, error) {
+	userID, err := sm.Login(ctx, req.GetAccount(), req.GetPassword(), req.GetDeviceID())
+	if err != nil {
+		msg := "账号或密码错误"
+		if errors.Is(err, storage.ErrDeviceBelongsToUser) {
+			msg = "该did已绑定其他账号"
+		}
+		return &LoginResponse{Base: &base.BaseResp{Code: 1, Msg: msg}}, nil
+	}
+	return &LoginResponse{
+		Base:         &base.BaseResp{Code: 0, Msg: "ok"},
+		UserID:       userID,
+		SessionToken: auth.IssueSessionToken(userID, req.GetDeviceID(), time.Now()),
+	}, nil
+}
+
+func (s *Service) ListUserDevices(ctx context.Context, req *ListUserDevicesRequest) (*ListUserDevicesResponse, error) {
+	deviceIDs, err := sm.ListUserDeviceIDs(ctx, req.GetUserID())
+	if err != nil {
+		return &ListUserDevicesResponse{Base: &base.BaseResp{Code: 1, Msg: strings.TrimSpace(err.Error())}}, nil
+	}
+	return &ListUserDevicesResponse{Base: &base.BaseResp{Code: 0, Msg: "ok"}, DeviceIDs: deviceIDs}, nil
 }
 
 type Service struct {

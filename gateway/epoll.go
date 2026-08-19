@@ -57,20 +57,21 @@ func (e *ePool) createAcceptProcess() {
 		go func() {
 			for {
 				// 当有客户端接入，就能拿到客户端到gateway的conn
-				conn, e := e.ln.AcceptTCP()
+				conn, err := e.ln.AcceptTCP()
+				if err != nil {
+					if ne, ok := err.(net.Error); ok && ne.Timeout() {
+						log.Printf("accept temporary error: %v", ne)
+						continue
+					}
+					log.Printf("accept error: %v", err)
+					continue
+				}
 				// 限流熔断
 				if !checkTcp() {
 					_ = conn.Close()
 					continue
 				}
 				setTcpConifg(conn)
-				if e != nil {
-					if ne, ok := e.(net.Error); ok && ne.Timeout() {
-						fmt.Errorf("accept temp err: %v", ne)
-						continue
-					}
-					fmt.Errorf("accept err: %v", e)
-				}
 				c := NewConnection(conn)
 				ep.addTask(c)
 			}

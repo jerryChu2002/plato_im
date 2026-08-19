@@ -2,12 +2,15 @@ package storage
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/hardcore-os/plato/common/bus/event"
 	"github.com/hardcore-os/plato/common/cache"
 	"github.com/hardcore-os/plato/common/config"
 	"github.com/hardcore-os/plato/common/idl/domain/user"
+	"golang.org/x/crypto/bcrypt"
 	"gorm.io/driver/mysql"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
@@ -36,6 +39,9 @@ func NewStorageManager(isTest bool) *StorageManager {
 	if err != nil {
 		panic(err)
 	}
+	if err = sm.db.AutoMigrate(&UserDAO{}, &AccountDAO{}, &DeviceDAO{}); err != nil {
+		panic(err)
+	}
 	return sm
 }
 
@@ -49,11 +55,98 @@ func newMockStorageManager() *StorageManager {
 	if err != nil {
 		panic(err)
 	}
-	err = sm.db.AutoMigrate(&UserDAO{})
+	err = sm.db.AutoMigrate(&UserDAO{}, &AccountDAO{}, &DeviceDAO{})
 	if err != nil {
 		panic(err)
 	}
 	return sm
+}
+
+var (
+	ErrAccountExists       = errors.New("account already exists")
+	ErrInvalidCredentials  = errors.New("invalid account or password")
+	ErrDeviceBelongsToUser = errors.New("device belongs to another user")
+)
+
+func normalizeAccount(account string) string {
+	return strings.ToLower(strings.TrimSpace(account))
+}
+
+func (s *StorageManager) Register(ctx context.Context, account, password, nickname string, deviceID uint64) (uint64, error) {
+	account = normalizeAccount(account)
+	if account == "" || len(password) < 6 || deviceID == 0 {
+		return 0, ErrInvalidCredentials
+	}
+	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	if err != nil {
+		return 0, err
+	}
+	var userID uint64
+	err = s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var count int64
+		if err := tx.Model(&AccountDAO{}).Where("account = ?", account).Count(&count).Error; err != nil {
+			return err
+		}
+		if count != 0 {
+			return ErrAccountExists
+		}
+		userRow := &UserDAO{Nickname: strings.TrimSpace(nickname)}
+		if err := tx.Create(userRow).Error; err != nil {
+			return err
+		}
+		userID = uint64(userRow.ID)
+		if err := tx.Model(userRow).Update("user_id", userID).Error; err != nil {
+			return err
+		}
+		if err := tx.Create(&AccountDAO{UserID: userID, Account: account, PasswordHash: string(hash)}).Error; err != nil {
+			return err
+		}
+		return bindDevice(tx, userID, deviceID)
+	})
+	return userID, err
+}
+
+func (s *StorageManager) Login(ctx context.Context, account, password string, deviceID uint64) (uint64, error) {
+	if deviceID == 0 {
+		return 0, ErrInvalidCredentials
+	}
+	var accountRow AccountDAO
+	if err := s.db.WithContext(ctx).Where("account = ?", normalizeAccount(account)).First(&accountRow).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return 0, ErrInvalidCredentials
+		}
+		return 0, err
+	}
+	if bcrypt.CompareHashAndPassword([]byte(accountRow.PasswordHash), []byte(password)) != nil {
+		return 0, ErrInvalidCredentials
+	}
+	if err := s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		return bindDevice(tx, accountRow.UserID, deviceID)
+	}); err != nil {
+		return 0, err
+	}
+	return accountRow.UserID, nil
+}
+
+func bindDevice(tx *gorm.DB, userID, deviceID uint64) error {
+	var device DeviceDAO
+	err := tx.Where("device_id = ?", deviceID).First(&device).Error
+	if err == nil {
+		if device.UserID != userID {
+			return ErrDeviceBelongsToUser
+		}
+		return nil
+	}
+	if !errors.Is(err, gorm.ErrRecordNotFound) {
+		return err
+	}
+	return tx.Create(&DeviceDAO{DeviceID: deviceID, UserID: userID}).Error
+}
+
+func (s *StorageManager) ListUserDeviceIDs(ctx context.Context, userID uint64) ([]uint64, error) {
+	var deviceIDs []uint64
+	err := s.db.WithContext(ctx).Model(&DeviceDAO{}).Where("user_id = ?", userID).Order("device_id").Pluck("device_id", &deviceIDs).Error
+	return deviceIDs, err
 }
 
 func (s *StorageManager) QueryUsers(ctx context.Context, querys map[uint64]*Options) map[uint64]*user.UserDTO {

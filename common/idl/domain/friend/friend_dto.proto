@@ -1,0 +1,29 @@
+syntax = "proto3";
+
+option go_package = "common/idl/domain/friend;frienddto";
+
+package frienddto;
+// 在项目根目录下执行 protoc --go-grpc_out=. --go_out=. ./common/idl/domain/friend/friend_dto.proto
+
+enum FriendRequestStatus {
+    Pending = 0;
+    Agreed = 1;
+    Rejected = 2;
+}
+
+// FriendRequestDTO 一条好友申请记录
+message FriendRequestDTO {
+    uint64 ID = 1;
+    uint64 FromDid = 2;
+    uint64 ToDid = 3;
+    string Message = 4;
+    FriendRequestStatus Status = 5;
+    int64 CreateTime = 6;
+}
+
+// FriendDTO 好友列表里的一条好友
+message FriendDTO {
+    uint64 Did = 1;    // 好友的did
+    string Remark = 2; // 我对这个好友的备注
+    int64 CreateTime = 3;
+}

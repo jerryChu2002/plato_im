@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"errors"
+	"fmt"
 	"net"
 	"sync"
 	"time"
@@ -9,38 +10,56 @@ import (
 
 var node *ConnIDGenerater
 
-// 如果想要调整编码，就直接调整这里即可
+// connID 位布局：1 bit版本 + 41 bit毫秒时间戳 + 10 bit网关节点ID + 12 bit毫秒内序号。
+// 节点ID由gateway启动时通过etcd租约抢占，保证多个在线gateway使用不同节点位。
 const (
-	version      = uint64(0) // 版本控制
-	sequenceBits = uint64(16)
+	versionBits  = uint8(1)
+	timeBits     = uint8(41)
+	nodeBits     = uint8(10)
+	sequenceBits = uint8(12)
 
-	maxSequence = int64(-1) ^ (int64(-1) << sequenceBits)
+	maxNodeID    = uint64(1<<nodeBits) - 1
+	maxSequence  = int64(1<<sequenceBits) - 1
+	maxTimestamp = int64(1<<timeBits) - 1
 
-	timeLeft    = uint8(16) // timeLeft = sequenceBits // 时间戳向左偏移量
-	versionLeft = uint8(63) // 左移动到最高位
+	nodeLeft    = sequenceBits
+	timeLeft    = nodeBits + sequenceBits
+	versionLeft = uint8(64) - versionBits
 	// 2020-05-20 08:00:00 +0800 CST
 	twepoch = int64(1589923200000) // 常量时间戳(毫秒)
+	version = uint64(1)
 )
 
 type ConnIDGenerater struct {
 	mu        sync.Mutex
-	LastStamp int64 // 记录上一次ID的时间戳
-	Sequence  int64 // 当前毫秒已经生成的ID序列号(从0 开始累加) 1毫秒内最多生成2^16个ID（因为对雪花算法进行了改造）
+	nodeID    uint64
+	lastStamp int64
+	sequence  int64
+	now       func() int64
 }
 
 type connection struct {
-	id   uint64 // 进程级别的生命周期
-	fd   int
-	e    *epoller
-	conn *net.TCPConn
-}
-
-func init() {
-	node = &ConnIDGenerater{}
+	id        uint64 // 进程级别的生命周期
+	fd        int
+	e         *epoller
+	conn      *net.TCPConn
+	closeOnce sync.Once // 防止EOF处理和state主动踢连接同时重复关闭同一个socket
 }
 
 func (c *ConnIDGenerater) getMilliSeconds() int64 {
-	return time.Now().UnixNano() / 1e6
+	return c.now()
+}
+
+func NewConnIDGenerater(nodeID uint64) (*ConnIDGenerater, error) {
+	if nodeID > maxNodeID {
+		return nil, fmt.Errorf("gateway node ID %d exceeds max %d", nodeID, maxNodeID)
+	}
+	return &ConnIDGenerater{
+		nodeID: nodeID,
+		now: func() int64 {
+			return time.Now().UnixNano() / 1e6
+		},
+	}, nil
 }
 
 func NewConnection(conn *net.TCPConn) *connection {
@@ -56,12 +75,18 @@ func NewConnection(conn *net.TCPConn) *connection {
 	}
 }
 func (c *connection) Close() {
-	ep.tables.Delete(c.id)
-	if c.e != nil {
-		c.e.fdToConnTable.Delete(c.fd)
-	}
-	err := c.conn.Close()
-	panic(err)
+	c.closeOnce.Do(func() {
+		if ep != nil {
+			ep.tables.Delete(c.id)
+		}
+		if c.e != nil {
+			c.e.fdToConnTable.Delete(c.fd)
+		}
+		// 连接关闭是幂等清理路径，socket已经被对端关闭时的错误不应杀掉gateway进程。
+		if c.conn != nil {
+			_ = c.conn.Close()
+		}
+	})
 }
 
 func (c *connection) RemoteAddr() string {
@@ -81,23 +106,31 @@ func (w *ConnIDGenerater) NextID() (uint64, error) {
 
 func (w *ConnIDGenerater) nextID() (uint64, error) {
 	timeStamp := w.getMilliSeconds()
-	if timeStamp < w.LastStamp {
-		return 0, errors.New("time is moving backwards,waiting until")
+	if timeStamp < twepoch {
+		return 0, errors.New("current time is before connID epoch")
+	}
+	if timeStamp < w.lastStamp {
+		return 0, errors.New("time is moving backwards, waiting until")
 	}
 
-	if w.LastStamp == timeStamp {
-		w.Sequence = (w.Sequence + 1) & maxSequence
-		if w.Sequence == 0 { // 如果这里发生溢出，就等到下一个毫秒时再分配，这样就一定出现重复
-			for timeStamp <= w.LastStamp {
+	if w.lastStamp == timeStamp {
+		w.sequence = (w.sequence + 1) & maxSequence
+		if w.sequence == 0 {
+			for timeStamp <= w.lastStamp {
 				timeStamp = w.getMilliSeconds()
 			}
 		}
-	} else { // 如果与上次分配的时间戳不等，则为了防止可能的时钟飘移现象，就必须重新计数
-		w.Sequence = 0
+	} else {
+		w.sequence = 0
 	}
-	w.LastStamp = timeStamp
-	//减法可以压缩一下时间戳
-	id := ((timeStamp - twepoch) << timeLeft) | w.Sequence
-	connID := uint64(id) | (version << versionLeft)
+	w.lastStamp = timeStamp
+	timestamp := timeStamp - twepoch
+	if timestamp > maxTimestamp {
+		return 0, errors.New("connID timestamp bits exhausted")
+	}
+	connID := (version << versionLeft) |
+		(uint64(timestamp) << timeLeft) |
+		(w.nodeID << nodeLeft) |
+		uint64(w.sequence)
 	return connID, nil
 }

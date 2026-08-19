@@ -29,25 +29,25 @@ func TestUserDomain(t *testing.T) {
 	if err != nil {
 		panic(err)
 	}
-	fmt.Printf("CreateUsers reps=%+v\n", *resp)
+	fmt.Printf("CreateUsers reps=%+v\n", resp)
 
 	queryResp, err := userCli.QueryUsers(ctx, mockQueryUsersRequest())
 	if err != nil {
 		panic(err)
 	}
-	fmt.Printf("QueryUsers1 reps=%+v\n", *queryResp)
+	fmt.Printf("QueryUsers1 reps=%+v\n", queryResp)
 
 	updateResp, err := userCli.UpdateUsers(ctx, mockUpdateUsersRequest())
 	if err != nil {
 		panic(err)
 	}
-	fmt.Printf("UpdateUsers reps=%+v\n", *updateResp)
+	fmt.Printf("UpdateUsers reps=%+v\n", updateResp)
 
 	queryResp, err = userCli.QueryUsers(ctx, mockQueryUsersRequest())
 	if err != nil {
 		panic(err)
 	}
-	fmt.Printf("QueryUsers2 reps=%+v\n", *queryResp)
+	fmt.Printf("QueryUsers2 reps=%+v\n", queryResp)
 }
 
 func mockRPC() {

@@ -4,7 +4,7 @@ syntax = "proto3";
 import "common/idl/base/base.proto";
 import "common/idl/domain/user/user_dto.proto";
 package  service;
-option go_package = "domain/user/rpc/service";
+option go_package = "github.com/hardcore-os/plato/domain/user/rpc/service";
 
 
 // user domain rpc server定义
@@ -14,6 +14,43 @@ service user {
     rpc QueryUsers(QueryUsersRequest) returns (QueryUsersResponse);
     rpc CreateUsers(CreateUsersRequest) returns (CreateUsersResponse);
     rpc UpdateUsers(UpdateUsersRequest) returns (UpdateUsersResponse);
+    rpc Register(RegisterRequest) returns (RegisterResponse);
+    rpc Login(LoginRequest) returns (LoginResponse);
+    rpc ListUserDevices(ListUserDevicesRequest) returns (ListUserDevicesResponse);
+}
+
+message RegisterRequest {
+    string account = 1;
+    string password = 2;
+    string nickname = 3;
+    uint64 deviceID = 4;
+}
+
+message RegisterResponse {
+    base.BaseResp base = 1;
+    uint64 userID = 2;
+    string sessionToken = 3;
+}
+
+message LoginRequest {
+    string account = 1;
+    string password = 2;
+    uint64 deviceID = 3;
+}
+
+message LoginResponse {
+    base.BaseResp base = 1;
+    uint64 userID = 2;
+    string sessionToken = 3;
+}
+
+message ListUserDevicesRequest {
+    uint64 userID = 1;
+}
+
+message ListUserDevicesResponse {
+    base.BaseResp base = 1;
+    repeated uint64 deviceIDs = 2;
 }
   
 message QueryUsersRequest{

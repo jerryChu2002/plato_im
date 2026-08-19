@@ -38,7 +38,7 @@ func NewPClient(serviceName string, interceptors ...grpc.UnaryClientInterceptor)
 	if p.d == nil {
 		dis, err := plugin.GetDiscovInstance()
 		if err != nil {
-			panic(err)
+			return nil, err
 		}
 
 		p.d = dis

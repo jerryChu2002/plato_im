@@ -1,5 +1,8 @@
 global:
   env: debug
+auth:
+  session_secret: "plato-local-development-secret-change-in-production"
+  session_ttl: 168h
 discovery:
   endpoints:
     - localhost:2379
@@ -45,5 +48,28 @@ user_domain:
   service_name: "plato.domain.user"
   service_addr: "127.0.0.1"
   service_port: 8903
+  weight: 100
+  db_dns: "user:password@tcp(127.0.0.1:3306)/database?charset=utf8mb4&parseTime=True&loc=Local"
+kafka:
+  brokers:
+    - 127.0.0.1:9092
+  chat_topic: plato_chat_msg
+  consumer_group: plato_message_consumer
+message_domain:
+  service_name: "plato.domain.message"
+  service_addr: "127.0.0.1"
+  service_port: 8904
+  weight: 100
+  db_dns: "user:password@tcp(127.0.0.1:3306)/database?charset=utf8mb4&parseTime=True&loc=Local"
+friend_domain:
+  service_name: "plato.domain.friend"
+  service_addr: "127.0.0.1"
+  service_port: 8905
+  weight: 100
+  db_dns: "user:password@tcp(127.0.0.1:3306)/database?charset=utf8mb4&parseTime=True&loc=Local"
+group_domain:
+  service_name: "plato.domain.group"
+  service_addr: "127.0.0.1"
+  service_port: 8906
   weight: 100
   db_dns: "user:password@tcp(127.0.0.1:3306)/database?charset=utf8mb4&parseTime=True&loc=Local"

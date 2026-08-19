@@ -24,6 +24,7 @@ type connState struct {
 	msgTimerLock string
 	connID       uint64
 	did          uint64
+	userID       uint64
 }
 
 func (c *connState) close(ctx context.Context) error {
@@ -42,7 +43,7 @@ func (c *connState) close(ctx context.Context) error {
 	// TODO 这里也可以使用lua或者pipeline 来尽可能合并两次redis的操作 通常在大规模的应用中这是有效的
 	// TODO 这里是要好好思考一下，网络调用次数的时间&空间复杂度的
 	slotKey := cs.getLoginSlotKey(c.connID)
-	meta := cs.loginSlotMarshal(c.did, c.connID)
+	meta := cs.loginSlotMarshal(c.userID, c.did, c.connID)
 	//删除登陆槽位
 	err := cache.SREM(ctx, slotKey, meta)
 	if err != nil {
@@ -66,10 +67,15 @@ func (c *connState) close(ctx context.Context) error {
 		}
 	}
 
-	//根据did删除路由
-	err = router.DelRecord(ctx, c.did)
-	if err != nil {
-		return err
+	// 根据did取出当前路由；只有它仍指向本connID时才删除，避免旧连接延迟清理误删重连后的新路由。
+	rec, recErr := router.QueryRecord(ctx, c.did)
+	if recErr != nil {
+		return recErr
+	}
+	if rec != nil && rec.ConndID == c.connID {
+		if _, err = router.DelRecordIfMatch(ctx, c.did, rec.Endpoint, c.connID); err != nil {
+			return err
+		}
 	}
 
 	//下行消息的lastMsg
@@ -80,9 +86,11 @@ func (c *connState) close(ctx context.Context) error {
 	}
 
 	//通知gateway server关闭长连接socket
-	err = client.DelConn(&ctx, c.connID, nil)
-	if err != nil {
-		return err
+	if rec != nil && rec.ConndID == c.connID {
+		err = client.DelConn(&ctx, rec.Endpoint, c.connID, nil)
+		if err != nil {
+			return err
+		}
 	}
 
 	//删除本地的状态

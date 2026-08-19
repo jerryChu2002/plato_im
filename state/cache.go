@@ -20,7 +20,6 @@ var cs *cacheState
 
 // 远程cache状态
 type cacheState struct {
-	msgID uint64 // test
 	// connID -> connState 的映射
 	connToStateTable sync.Map
 	server           *service.Service
@@ -50,10 +49,13 @@ func (cs *cacheState) initLoginSlot(ctx context.Context) error {
 				panic(err)
 			}
 			for _, mate := range loginSlot {
-				//槽中存储的是连接及其对应did
-				did, connID := cs.loginSlotUnmarshal(mate)
+				// 槽中存储连接对应的账号、设备和连接ID
+				userID, did, connID := cs.loginSlotUnmarshal(mate)
+				if userID == 0 || did == 0 || connID == 0 {
+					continue
+				}
 				//每次state server重启的时候，进行一次reLogin
-				cs.connReLogin(ctx, did, connID)
+				cs.connReLogin(ctx, userID, did, connID)
 			}
 		}()
 	}
@@ -61,27 +63,29 @@ func (cs *cacheState) initLoginSlot(ctx context.Context) error {
 }
 
 // newConnState login或reLogin的时候会调用
-func (cs *cacheState) newConnState(did, connID uint64) *connState {
+func (cs *cacheState) newConnState(userID, did, connID uint64) *connState {
 	// 创建链接状态对象
-	state := &connState{connID: connID, did: did}
+	state := &connState{connID: connID, did: did, userID: userID}
 	// 启动心跳定时器
 	state.reSetHeartTimer()
 	return state
 }
 
-func (cs *cacheState) connLogin(ctx context.Context, did, connID uint64) error {
-	state := cs.newConnState(did, connID)
+func (cs *cacheState) connLogin(ctx context.Context, userID, did, connID uint64, gatewayEndpoint string) error {
+	state := cs.newConnState(userID, did, connID)
 	// 登陆槽存储
 	slotKey := cs.getLoginSlotKey(connID)
-	meta := cs.loginSlotMarshal(did, connID)
+	meta := cs.loginSlotMarshal(userID, did, connID)
 	err := cache.SADD(ctx, slotKey, meta)
 	if err != nil {
 		return err
 	}
 
-	// 添加路由记录 todo 这里好像是记录从哪个网关来的？
-	endPoint := fmt.Sprintf("%s:%d", config.GetGatewayServiceAddr(), config.GetGatewayTCPServerPort())
-	err = router.AddRecord(ctx, did, endPoint, connID)
+	// 添加路由记录:记录该did当前登录在哪个gateway实例的哪个connID上。
+	// gatewayEndpoint必须是"这条连接实际经由的那个gateway实例"的RPC地址(由调用方从
+	// 收到的上行请求里获得)，而不能取本进程配置里的固定值——否则多网关部署下永远只会
+	// 记录成state自己配置的那一个gateway，其它gateway上的连接会被错误路由。
+	err = router.AddRecord(ctx, did, gatewayEndpoint, connID)
 	if err != nil {
 		return err
 	}
@@ -94,8 +98,8 @@ func (cs *cacheState) connLogin(ctx context.Context, did, connID uint64) error {
 }
 
 // connReLogin 由state server重启使用
-func (cs *cacheState) connReLogin(ctx context.Context, did, connID uint64) {
-	state := cs.newConnState(did, connID)
+func (cs *cacheState) connReLogin(ctx context.Context, userID, did, connID uint64) {
+	state := cs.newConnState(userID, did, connID)
 	//缓存重建
 	cs.storeConnIDState(connID, state)
 	state.loadMsgTimer(ctx)
@@ -109,15 +113,20 @@ func (cs *cacheState) connLogOut(ctx context.Context, connID uint64) (uint64, er
 	return 0, nil
 }
 
-func (cs *cacheState) reConn(ctx context.Context, oldConnID, newConnID uint64) error {
+// reConn 处理重连：登出旧connID、以同一个did登入新connID。返回did供调用方组装ACK。
+// gatewayEndpoint是新连接实际经由的那个gateway实例地址(重连完全可能落在与之前不同的gateway上)。
+func (cs *cacheState) reConn(ctx context.Context, oldConnID, newConnID uint64, gatewayEndpoint string) (uint64, uint64, error) {
 	var (
-		did uint64
-		err error
+		userID uint64
+		did    uint64
 	)
-	if did, err = cs.connLogOut(ctx, oldConnID); err != nil {
-		return err
+	if state, ok := cs.loadConnIDState(oldConnID); ok {
+		userID, did = state.userID, state.did
 	}
-	return cs.connLogin(ctx, did, newConnID) // 重连路由是不用更新的
+	if _, err := cs.connLogOut(ctx, oldConnID); err != nil {
+		return 0, 0, err
+	}
+	return userID, did, cs.connLogin(ctx, userID, did, newConnID, gatewayEndpoint)
 }
 
 func (cs *cacheState) reSetHeartTimer(connID uint64) {
@@ -221,21 +230,25 @@ func (cs *cacheState) getLastMsg(ctx context.Context, connID uint64) (*message.P
 	return pushMsg, nil
 }
 
-func (cs *cacheState) loginSlotUnmarshal(mate string) (uint64, uint64) {
+func (cs *cacheState) loginSlotUnmarshal(mate string) (uint64, uint64, uint64) {
 	strs := strings.Split(mate, "|")
-	if len(strs) < 2 {
-		return 0, 0
+	if len(strs) != 3 {
+		return 0, 0, 0
 	}
-	did, err := strconv.ParseUint(strs[0], 10, 64)
+	userID, err := strconv.ParseUint(strs[0], 10, 64)
 	if err != nil {
 		panic(err)
 	}
-	connID, err := strconv.ParseUint(strs[1], 10, 64)
+	did, err := strconv.ParseUint(strs[1], 10, 64)
 	if err != nil {
 		panic(err)
 	}
-	return did, connID
+	connID, err := strconv.ParseUint(strs[2], 10, 64)
+	if err != nil {
+		panic(err)
+	}
+	return userID, did, connID
 }
-func (cs *cacheState) loginSlotMarshal(did, connID uint64) string {
-	return fmt.Sprintf("%d|%d", did, connID)
+func (cs *cacheState) loginSlotMarshal(userID, did, connID uint64) string {
+	return fmt.Sprintf("%d|%d|%d", userID, did, connID)
 }

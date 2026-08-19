@@ -1,0 +1,53 @@
+# Fyne桌面GUI客户端的独立镜像，不复用主Dockerfile：Fyne依赖CGO+OpenGL+X11开发库，
+# 塞进主Dockerfile会导致gateway/state/message/friend/group这些不需要GUI的服务镜像
+# 也被迫带上这些体积和构建依赖。
+#
+# 运行方式：容器内没有真实显示设备，用Xvfb起一个虚拟显示 + x11vnc把画面转发出来，
+# 宿主机用普通VNC客户端连 5900 端口查看/操作这个原生Fyne窗口(不是网页版，VNC只转发画面)。
+FROM golang:1.25-alpine AS builder
+
+WORKDIR /src
+ENV CGO_ENABLED=1 GOTOOLCHAIN=auto CGO_CFLAGS="-D_LARGEFILE64_SOURCE"
+
+# gcc/musl-dev: 项目里其它包(如go-sqlite3)已有的CGO编译要求，同款处理。
+# 下面这些是Fyne本身需要的X11/OpenGL开发头文件：alpine包名和Debian不同，
+# 已用 `apk search` 逐一核实存在于3.20仓库，不是照抄Debian包名假设。
+RUN apk add --no-cache \
+    gcc musl-dev pkgconfig \
+    libx11-dev libxcursor-dev libxrandr-dev libxinerama-dev libxi-dev libxxf86vm-dev \
+    mesa-dev wayland-dev libxkbcommon-dev
+
+COPY go.mod go.sum ./
+RUN go mod download
+
+COPY . .
+RUN go build -tags guiclient -o /out/plato-gui .
+
+# 运行时镜像：alpine + Xvfb(虚拟显示) + x11vnc(画面转发) + mesa运行时库(软件渲染，
+# 容器内没有真实GPU，靠mesa-dri-gallium的llvmpipe软件光栅化)。
+FROM alpine:3.20
+
+# font-wqy-zenhei: 项目里的界面文案(好友/群/消息提示)全是中文，ttf-dejavu不含中文字形，
+# 不装的话中文会渲染成方块乱码(实测过，见阶段2验证记录)。
+# fluxbox: 轻量窗口管理器。裸Xvfb没有WM时新弹出的窗口(好友/群组管理面板、各种对话框)
+# 没有层叠/焦点管理，实测会被主窗口完全遮挡且无法区分前后台——这个界面大量依赖弹窗，
+# 必须有一个WM才能正常交互。
+RUN apk add --no-cache \
+    ca-certificates \
+    xvfb x11vnc fluxbox novnc websockify \
+    mesa-gl mesa-dri-gallium mesa-egl \
+    ttf-dejavu font-wqy-zenhei \
+    dbus dbus-x11 fontconfig
+
+WORKDIR /app
+COPY --from=builder /out/plato-gui /app/plato-gui
+COPY plato.docker.yaml /app/plato.yaml
+COPY guiclient/entrypoint.sh /app/entrypoint.sh
+RUN chmod +x /app/entrypoint.sh
+
+ENV DISPLAY=:99
+# 容器内没有真实GPU，强制Fyne走mesa的软件光栅化路径，避免尝试探测硬件加速失败。
+ENV LIBGL_ALWAYS_SOFTWARE=1
+EXPOSE 5900 6080
+
+ENTRYPOINT ["/app/entrypoint.sh"]

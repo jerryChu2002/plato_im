@@ -1,0 +1,76 @@
+syntax = "proto3";
+
+import "common/idl/base/base.proto";
+import "common/idl/domain/friend/friend_dto.proto";
+
+package service;
+option go_package = "domain/friend/rpc/service";
+
+// friend domain rpc server定义
+// 在项目根目录下执行 protoc --go-grpc_out=. --go_out=. ./domain/friend/rpc/service/friend.proto
+
+service friend {
+    // SendFriendRequest 发起一条好友申请(按对方uid/did)
+    rpc SendFriendRequest(SendFriendRequestReq) returns (SendFriendRequestResp);
+    // HandleFriendRequest 被申请方同意/拒绝一条好友申请，处理后会通知申请方
+    rpc HandleFriendRequest(HandleFriendRequestReq) returns (HandleFriendRequestResp);
+    // ListFriends 查好友列表
+    rpc ListFriends(ListFriendsReq) returns (ListFriendsResp);
+    // DeleteFriend 删除好友(双向关系一并删除)
+    rpc DeleteFriend(DeleteFriendReq) returns (DeleteFriendResp);
+    // ListPendingRequests 查我收到的、还未处理的好友申请
+    rpc ListPendingRequests(ListPendingRequestsReq) returns (ListPendingRequestsResp);
+    // ListSentRequests 查我发出的好友申请及其处理状态(用于离线期间被处理后，上线时能看到结果)
+    rpc ListSentRequests(ListSentRequestsReq) returns (ListSentRequestsResp);
+}
+
+message SendFriendRequestReq {
+    uint64 fromDid = 1;
+    uint64 toDid = 2;
+    string message = 3;
+}
+message SendFriendRequestResp {
+    base.BaseResp base = 1;
+    uint64 requestID = 2;
+}
+
+message HandleFriendRequestReq {
+    uint64 requestID = 1;
+    uint64 operatorDid = 2; // 必须是该申请的toDid，用于基本的越权校验
+    bool agree = 3;
+}
+message HandleFriendRequestResp {
+    base.BaseResp base = 1;
+}
+
+message ListFriendsReq {
+    uint64 did = 1;
+}
+message ListFriendsResp {
+    base.BaseResp base = 1;
+    repeated frienddto.FriendDTO friends = 2;
+}
+
+message DeleteFriendReq {
+    uint64 did = 1;
+    uint64 friendDid = 2;
+}
+message DeleteFriendResp {
+    base.BaseResp base = 1;
+}
+
+message ListPendingRequestsReq {
+    uint64 did = 1;
+}
+message ListPendingRequestsResp {
+    base.BaseResp base = 1;
+    repeated frienddto.FriendRequestDTO requests = 2;
+}
+
+message ListSentRequestsReq {
+    uint64 did = 1;
+}
+message ListSentRequestsResp {
+    base.BaseResp base = 1;
+    repeated frienddto.FriendRequestDTO requests = 2;
+}

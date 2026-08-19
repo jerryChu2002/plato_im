@@ -1,0 +1,77 @@
+global:
+  env: debug
+auth:
+  session_secret: "plato-local-development-secret-change-in-production"
+  session_ttl: 168h
+discovery:
+  endpoints:
+    - etcd:2379
+  timeout: 5
+cache:
+  redis:
+    endpoints:
+    - redis:6379
+ip_conf:
+  service_path: /plato/ip_dispatcher
+prpc:
+  discov:
+    name: etcd
+    endpoints:
+      - etcd:2379
+  trace:
+    enable: true
+    url: http://jaeger:14268/api/traces
+    service_name: plato
+    sampler: 1.0
+gateway:
+  service_name: "plato.access.gateway"
+  # 容器名而非IP：state/domain服务反查"这条连接归属哪个gateway"时，
+  # 要能在docker compose内部网络里通过服务名解析到这个容器
+  service_addr: "gateway"
+  tcp_max_num: 70000
+  epoll_channel_num: 100
+  epoll_num: 4
+  epoll_wait_queue_size: 100
+  tcp_server_port: 8900
+  rpc_server_port: 8901
+  worker_pool_num: 1024
+  cmd_channel_num: 2048
+  weight: 100
+  state_server_endpoint: "state:8902"
+state:
+  service_name: "plato.access.state"
+  service_addr: "state"
+  cmd_channel_num: 2048
+  server_port: 8902
+  weight: 100
+  conn_state_slot_range: "0,1024"
+  gateway_server_endpoint: "gateway:8901"
+user_domain:
+  service_name: "plato.domain.user"
+  service_addr: "user"
+  service_port: 8903
+  weight: 100
+  db_dns: "user:password@tcp(mysql:3306)/database?charset=utf8mb4&parseTime=True&loc=Local"
+kafka:
+  brokers:
+    - kafka:9092
+  chat_topic: plato_chat_msg
+  consumer_group: plato_message_consumer
+message_domain:
+  service_name: "plato.domain.message"
+  service_addr: "message"
+  service_port: 8904
+  weight: 100
+  db_dns: "user:password@tcp(mysql:3306)/database?charset=utf8mb4&parseTime=True&loc=Local"
+friend_domain:
+  service_name: "plato.domain.friend"
+  service_addr: "friend"
+  service_port: 8905
+  weight: 100
+  db_dns: "user:password@tcp(mysql:3306)/database?charset=utf8mb4&parseTime=True&loc=Local"
+group_domain:
+  service_name: "plato.domain.group"
+  service_addr: "group"
+  service_port: 8906
+  weight: 100
+  db_dns: "user:password@tcp(mysql:3306)/database?charset=utf8mb4&parseTime=True&loc=Local"

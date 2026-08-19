@@ -11,10 +11,10 @@ func GetDomainUserServerAddr() string {
 }
 
 func GetDomainUserServerPoint() int {
-	return viper.GetInt("user_dimain.service_port")
+	return viper.GetInt("user_domain.service_port")
 }
 func GetDomainUserRPCWeight() int {
-	return viper.GetInt("user_dimain.weight")
+	return viper.GetInt("user_domain.weight")
 }
 func GetDomainUserDBDNS() string {
 	return viper.GetString("user_domain.db_dns")

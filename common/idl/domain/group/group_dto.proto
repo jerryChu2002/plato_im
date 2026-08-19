@@ -1,0 +1,23 @@
+syntax = "proto3";
+
+option go_package = "github.com/hardcore-os/plato/common/idl/domain/group;groupdto";
+
+package groupdto;
+// 在项目根目录下执行 protoc --go-grpc_out=. --go_out=. ./common/idl/domain/group/group_dto.proto
+
+message GroupInfoDTO {
+    uint64 GroupID = 1;
+    string Name = 2;
+    uint64 OwnerDid = 3;
+    int64 CreateTime = 4;
+    int32 MemberCount = 5;
+    uint64 OwnerUserID = 6;
+}
+
+message GroupMemberDTO {
+    uint64 GroupID = 1;
+    uint64 MemberDid = 2;
+    int32 Role = 3; // 0=普通成员 1=群主
+    int64 JoinTime = 4;
+    uint64 MemberUserID = 5;
+}

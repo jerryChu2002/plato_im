@@ -1,0 +1,53 @@
+syntax = "proto3";
+
+import "common/idl/base/base.proto";
+import "common/idl/domain/message/message_dto.proto";
+
+package service;
+option go_package = "github.com/hardcore-os/plato/domain/message/rpc/service";
+
+// message domain rpc server定义
+// 在项目根目录下执行 protoc --go-grpc_out=. --go_out=. ./domain/message/rpc/service/message.proto
+
+service message {
+    // GetMaxSeq 查询某个会话当前的最大seq，供客户端/其它服务判断是否需要补拉
+    rpc GetMaxSeq(GetMaxSeqRequest) returns (GetMaxSeqResponse);
+    // PullOfflineMsgs 拉取某会话在指定seq之后的消息，离线补拉与"漏消息"补拉共用同一个接口
+    rpc PullOfflineMsgs(PullOfflineMsgsRequest) returns (PullOfflineMsgsResponse);
+    // ListConversations 列出账号参与过的会话，并按当前did返回独立未读状态
+    rpc ListConversations(ListConversationsRequest) returns (ListConversationsResponse);
+}
+
+message ListConversationsRequest {
+    uint64 userID = 1;
+    uint64 did = 2;
+}
+
+message ListConversationsResponse {
+    base.BaseResp base = 1;
+    repeated messagedto.ConversationBrief conversations = 2;
+}
+
+message GetMaxSeqRequest {
+    string conversationID = 1;
+    uint64 did = 2; // 非0时，一并返回该did在这个会话的已读进度(readSeq)和派生出的未读数
+}
+
+message GetMaxSeqResponse {
+    base.BaseResp base = 1;
+    uint64 maxSeq = 2;
+    uint64 readSeq = 3; // 仅did非0时有意义：该did在此会话已读到的seq
+    uint64 unreadCount = 4; // = maxSeq - readSeq，仅did非0时有意义
+}
+
+message PullOfflineMsgsRequest {
+    string conversationID = 1;
+    uint64 fromSeq = 2; // 从此seq之后(不含)开始拉
+    uint32 limit = 3;
+}
+
+message PullOfflineMsgsResponse {
+    base.BaseResp base = 1;
+    repeated messagedto.ChatMsgDTO msgs = 2;
+    bool hasMore = 3;
+}

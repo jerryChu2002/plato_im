@@ -1,0 +1,44 @@
+syntax = "proto3";
+
+option go_package = "github.com/hardcore-os/plato/common/idl/domain/message;messagedto";
+
+package messagedto;
+// 在项目根目录下执行 protoc --go-grpc_out=. --go_out=. ./common/idl/domain/message/message_dto.proto
+
+// BizMsgType 消息的业务类型
+enum BizMsgType {
+    ChatSingle = 0;    // 单聊消息
+    ChatGroup = 1;     // 群聊消息
+    FriendRequest = 10; // 好友申请通知
+    FriendAgree = 11;   // 好友同意通知
+    FriendReject = 12;  // 好友拒绝通知
+    GroupInvite = 20;   // 群邀请通知
+    GroupKick = 21;     // 群踢出通知
+    SystemNotify = 30;  // 其它系统通知
+}
+
+// ChatMsgDTO 是Kafka传输与messages表持久化用的消息载体：
+// state在收到客户端UP消息后组装并生产到Kafka，domain/message的consumer消费后落库并决定推送目标。
+message ChatMsgDTO {
+    string ConversationID = 1; // 会话ID：单聊为"min(userA,userB)_max(userA,userB)"，群聊为"group_{groupID}"
+    uint64 FromDid = 2;        // 发送者did
+    uint64 ToDid = 3;          // 旧版单聊接收者did，新版单聊为0，群聊时也为0
+    uint64 GroupID = 4;        // 群聊群ID，单聊时为0
+    BizMsgType BizType = 5;    // 业务消息类型
+    bytes Content = 6;         // 消息内容(业务层自定义编码，服务端不解析)
+    uint64 Seq = 7;            // 服务端(state)在produce前用Redis INCR分配的会话内严格递增序号
+    string ClientMsgID = 8;    // 客户端生成的全局唯一ID(UUID)，用于跨连接的幂等去重
+    int64 CreateTime = 9;      // 消息创建时间(毫秒时间戳，由state侧生成后传入)
+    bool NotifyOnly = 10;      // 预留：未来超大群"仅通知不带正文、客户端主动拉取"的读扩散演进口子，当前不使用
+    uint64 FromUserID = 11;    // 发送者账号用户ID
+    uint64 ToUserID = 12;      // 单聊接收者账号用户ID，群聊时为0
+}
+
+// ConversationBrief 聊天列表里的一条会话摘要，登录/重连成功后随SyncConversations批量下发
+message ConversationBrief {
+    string ConversationID = 1;
+    uint64 MaxSeq = 2;
+    uint64 ReadSeq = 3;
+    uint64 UnreadCount = 4;
+    ChatMsgDTO LastMsg = 5;
+}

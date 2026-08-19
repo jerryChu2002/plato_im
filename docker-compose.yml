@@ -1,0 +1,147 @@
+# 说明：
+# - etcd/redis/mysql/kafka 是基础设施依赖；gateway/state/message/friend/group/user 是本项目的业务服务，
+#   共用同一个Dockerfile编译出的二进制，只是启动子命令不同。
+# - client 默认不随 `docker compose up`启动(profiles: ["client"])，因为它是一个需要交互式终端的
+#   gocui程序；用 `docker compose run --rm client` 单独拉起，一次调用相当于一个用户的客户端。
+# - 所有业务服务都通过plato.docker.yaml里配置的容器名(gateway/state/message/friend/group)
+#   互相寻址，而不是IP，这样etcd里注册的地址在容器间才是可解析的。
+
+services:
+  etcd:
+    image: quay.io/coreos/etcd:v3.5.15
+    environment:
+      - ETCD_ADVERTISE_CLIENT_URLS=http://etcd:2379
+      - ETCD_LISTEN_CLIENT_URLS=http://0.0.0.0:2379
+
+  redis:
+    image: redis:7.2-alpine
+
+  mysql:
+    image: mysql:latest
+    environment:
+      - MYSQL_ROOT_PASSWORD=root
+      - MYSQL_DATABASE=database
+      - MYSQL_USER=user
+      - MYSQL_PASSWORD=password
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uuser", "-ppassword"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  kafka:
+    image: bitnami/kafka:3.7
+    environment:
+      - KAFKA_CFG_NODE_ID=0
+      - KAFKA_CFG_PROCESS_ROLES=controller,broker
+      - KAFKA_CFG_LISTENERS=PLAINTEXT://:9092,CONTROLLER://:9093
+      - KAFKA_CFG_ADVERTISED_LISTENERS=PLAINTEXT://kafka:9092
+      - KAFKA_CFG_CONTROLLER_LISTENER_NAMES=CONTROLLER
+      - KAFKA_CFG_CONTROLLER_QUORUM_VOTERS=0@kafka:9093
+      - KAFKA_CFG_AUTO_CREATE_TOPICS_ENABLE=true
+
+  # gateway自己的service_addr(自身对外可达地址，用于etcd注册/回推路由)在进程启动时
+  # 自动探测本机出口网卡IP得出(common/config.GetGatewaySelfAdvertiseAddr)，不再依赖配置文件
+  # 里写死的值，所以可以直接用 `docker compose up -d --scale gateway=N` 起多个无差别副本
+  # 做水平扩展，每个副本会自动拿到自己独一无二的标识，不需要像早期版本那样为每个实例单独
+  # 维护一份配置文件。注意：scale>1时下面的host端口映射会冲突(多个副本抢同一个host端口)，
+  # 需要临时去掉ports段，通过容器名(如 plato_im-gateway-1/-2)在compose内部网络里访问。
+  gateway:
+    build: .
+    command: ["gateway"]
+    depends_on:
+      - etcd
+      - redis
+    ports:
+      - "8900:8900" # 客户端TCP长连接端口
+      - "8901:8901" # gateway自身的rpc端口(供state/domain服务反向推送)
+    restart: unless-stopped
+
+  state:
+    build: .
+    command: ["state"]
+    depends_on:
+      - etcd
+      - redis
+      - kafka
+      - gateway
+    restart: unless-stopped
+
+  message:
+    build: .
+    command: ["message"]
+    depends_on:
+      - etcd
+      - redis
+      - kafka
+      - mysql
+      - user
+    ports:
+      - "127.0.0.1:8904:8904"
+    restart: unless-stopped
+
+  friend:
+    build: .
+    command: ["friend"]
+    depends_on:
+      - etcd
+      - redis
+      - mysql
+    ports:
+      - "8905:8905"
+    restart: unless-stopped
+
+  group:
+    build: .
+    command: ["group"]
+    depends_on:
+      - etcd
+      - mysql
+    ports:
+      - "8906:8906"
+    restart: unless-stopped
+
+  user:
+    build: .
+    command: ["user", "domain"]
+    depends_on:
+      - etcd
+      - redis
+      - mysql
+    ports:
+      - "8903:8903"
+    restart: unless-stopped
+
+  # 交互式测试客户端，不随 `up` 自动启动。用法：
+  #   docker compose run --rm client
+  # 每次运行是一个独立的模拟用户终端，输入账号、密码和设备did后即可使用。
+  client:
+    build: .
+    command: ["client"]
+    profiles: ["client"]
+    depends_on:
+      - gateway
+      - friend
+      - group
+      - user
+    stdin_open: true
+    tty: true
+
+  # 原生TCP桌面客户端，通过浏览器中的noVNC访问容器内的Fyne界面：
+  #   docker compose --profile gui up -d guiclient
+  #   浏览器打开 http://localhost:6080
+  guiclient:
+    build:
+      context: .
+      dockerfile: Dockerfile.guiclient
+    profiles: ["gui"]
+    depends_on:
+      - gateway
+      - message
+      - friend
+      - group
+      - user
+    ports:
+      - "127.0.0.1:5900:5900"
+      - "127.0.0.1:6080:6080"
+    restart: unless-stopped

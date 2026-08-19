@@ -1,0 +1,65 @@
+syntax = "proto3";
+
+import "common/idl/base/base.proto";
+import "common/idl/domain/group/group_dto.proto";
+
+package service;
+option go_package = "github.com/hardcore-os/plato/domain/group/rpc/service";
+
+// group domain rpc server定义
+// 在项目根目录下执行 protoc --go-grpc_out=. --go_out=. ./domain/group/rpc/service/group.proto
+
+service group {
+    rpc CreateGroup(CreateGroupReq) returns (CreateGroupResp);
+    rpc InviteMembers(InviteMembersReq) returns (InviteMembersResp);
+    rpc LeaveGroup(LeaveGroupReq) returns (LeaveGroupResp);
+    rpc ListMembers(ListMembersReq) returns (ListMembersResp);
+    rpc ListMyGroups(ListMyGroupsReq) returns (ListMyGroupsResp);
+}
+
+message CreateGroupReq {
+    uint64 ownerDid = 1;
+    string name = 2;
+    uint64 ownerUserID = 3;
+}
+message CreateGroupResp {
+    base.BaseResp base = 1;
+    uint64 groupID = 2;
+}
+
+message InviteMembersReq {
+    uint64 groupID = 1;
+    uint64 operatorDid = 2; // 必须已经是群成员才能邀请他人
+    repeated uint64 memberDids = 3;
+    uint64 operatorUserID = 4; // 必须已经是群成员才能邀请他人
+    repeated uint64 memberUserIDs = 5;
+}
+message InviteMembersResp {
+    base.BaseResp base = 1;
+}
+
+message LeaveGroupReq {
+    uint64 groupID = 1;
+    uint64 did = 2;
+    uint64 userID = 3;
+}
+message LeaveGroupResp {
+    base.BaseResp base = 1;
+}
+
+message ListMembersReq {
+    uint64 groupID = 1;
+}
+message ListMembersResp {
+    base.BaseResp base = 1;
+    repeated groupdto.GroupMemberDTO members = 2;
+}
+
+message ListMyGroupsReq {
+    uint64 did = 1;
+    uint64 userID = 2;
+}
+message ListMyGroupsResp {
+    base.BaseResp base = 1;
+    repeated groupdto.GroupInfoDTO groups = 2;
+}

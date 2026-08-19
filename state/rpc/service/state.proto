@@ -1,19 +1,25 @@
 syntax = "proto3";
 
-option go_package = "./;service";
+option go_package = "state/rpc/service";
 
 package service;
 // 网关机的 rpc server定义
-// cd state/rpc 下 执行 protoc -I service --go_out=plugins=grpc:service service/state.proto
+// 在项目根目录下执行 protoc --go-grpc_out=. --go_out=. ./state/rpc/service/state.proto
 service state {
     rpc CancelConn (StateRequest) returns (StateResponse);
     rpc SendMsg (StateRequest) returns (StateResponse);
+    // PushToConn 供跨分片/跨服务的调用方(好友通知、群消息fan-out、Kafka consumer等)使用，
+    // 委托"持有目标connID内存状态"的这个state实例代为推送
+    rpc PushToConn (StateRequest) returns (StateResponse);
 }
   
 message StateRequest{
     string endpoint = 1;
     uint64 connID = 2;
     bytes  data = 3;
+    // seq 仅PushToConn使用：调用方(Kafka consumer等)已经分配好的会话内严格递增消息序号，
+    // 供state组装PushMsg时透传给客户端，客户端据此检测是否有消息丢失(需要补拉)
+    uint64 seq = 4;
 }
   
 message StateResponse {

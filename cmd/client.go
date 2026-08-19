@@ -15,5 +15,5 @@ var clientCmd = &cobra.Command{
 }
 
 func ClientHandle(cmd *cobra.Command, args []string) {
-	client.RunMain()
+	client.RunMain(ConfigPath)
 }
